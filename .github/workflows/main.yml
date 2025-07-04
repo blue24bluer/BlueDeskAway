@@ -1,37 +1,39 @@
-name: VNC with LocalXpose
+name: VNC with Web Access (Cloudflared)
 
 on:
   workflow_dispatch:
 
 jobs:
-  vnc-server:
+  run-vnc:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-    - name: 🧰 Install XFCE + VNC
+    - name: 🧰 Install Desktop & VNC
       run: |
         sudo apt update
-        sudo apt install -y xfce4 xfce4-goodies tightvncserver wget unzip curl
+        sudo apt install -y xfce4 xfce4-goodies tightvncserver wget curl
+
         mkdir -p ~/.vnc
         echo "mysecurepass" | vncpasswd -f > ~/.vnc/passwd
         chmod 600 ~/.vnc/passwd
-        echo "#!/bin/bash
-        startxfce4 &" > ~/.vnc/xstartup
+        echo '#!/bin/bash
+        startxfce4 &' > ~/.vnc/xstartup
         chmod +x ~/.vnc/xstartup
         vncserver :1
 
-    - name: 🔗 Install & Start LocalXpose Tunnel
+    - name: 🌐 Install noVNC and Websockify
       run: |
-        wget https://api.localxpose.io/api/downloads/loclx-linux-amd64.zip -O loclx.zip
-        unzip loclx.zip
-        chmod +x loclx
-        ./loclx authtoken rE9mIkydSoKxj1eZK3nAaGCfcdLTFn5xMN8mnFSR
-        ./loclx tcp --port 5901 --region eu &
-        sleep 20
-        echo "✅ VNC Tunnel Started on LocalXpose - راجع لوحة التحكم لرؤية الرابط"
+        git clone https://github.com/novnc/noVNC.git
+        git clone https://github.com/novnc/websockify noVNC/utils/websockify
+        nohup noVNC/utils/launch.sh --vnc localhost:5901 &
 
+    - name: ☁️ Create Tunnel using Cloudflared
+      run: |
+        wget -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+        chmod +x cloudflared
+        ./cloudflared tunnel --url http://localhost:6080 &
+        sleep 10
 
-
-    - name: ⏳ Keep the session alive
+    - name: 💤 Keep alive
       run: sleep 320m
