@@ -1,4 +1,4 @@
-name: VNC Desktop with Cloudflared Tunnel
+name: VNC Desktop with Cloudflared Tunnel and Logs
 
 on:
   workflow_dispatch:
@@ -22,22 +22,25 @@ jobs:
         vncserver :1
         netstat -tulpn | grep 5901
 
-    - name: Setup noVNC and websockify on port 6090
+    - name: Setup noVNC and websockify on port 6080 with logs
       run: |
         git clone https://github.com/novnc/noVNC.git
         git clone https://github.com/novnc/websockify noVNC/utils/websockify
-        nohup noVNC/utils/launch.sh --vnc localhost:5901 --listen 6090 > novnc.log 2>&1 &
+        nohup noVNC/utils/launch.sh --vnc localhost:5901 > novnc.log 2>&1 &
         sleep 20
-        curl -I http://localhost:6090
+        echo "---- noVNC Log Start ----"
+        cat novnc.log
+        echo "---- noVNC Log End ----"
+        curl -I http://localhost:6080 || echo "noVNC not reachable"
 
     - name: Install cloudflared and start tunnel
       run: |
         wget -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
-        nohup ./cloudflared tunnel --url http://localhost:6090 > tunnel.log 2>&1 &
+        nohup ./cloudflared tunnel --url http://localhost:6080 > tunnel.log 2>&1 &
         sleep 10
         echo "🌐 رابط الوصول:"
-        grep trycloudflare.com tunnel.log
+        grep trycloudflare.com tunnel.log || echo "رابط لم يظهر بعد"
 
     - name: Keep alive
       run: sleep 300m
