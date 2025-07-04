@@ -1,18 +1,18 @@
-name: RDP over Serveo
+name: VNC with LocalXpose
 
 on:
   workflow_dispatch:
 
 jobs:
-  serveo-vnc:
+  vnc-server:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-    - name: 🧰 Install Desktop + VNC
+    - name: 🧰 Install XFCE + VNC
       run: |
         sudo apt update
-        sudo apt install -y xfce4 xfce4-goodies tightvncserver openssh-client
+        sudo apt install -y xfce4 xfce4-goodies tightvncserver wget unzip curl
         mkdir -p ~/.vnc
         echo "mysecurepass" | vncpasswd -f > ~/.vnc/passwd
         chmod 600 ~/.vnc/passwd
@@ -21,9 +21,15 @@ jobs:
         chmod +x ~/.vnc/xstartup
         vncserver :1
 
-    - name: 🔗 Create tunnel using Serveo
+    - name: 🔗 Install & Start LocalXpose Tunnel
       run: |
-        ssh -o StrictHostKeyChecking=no -R 5900:localhost:5901 serveo.net &
-        sleep 30
-        echo "✅ افتح VNC على: serveo.net:5900 بكلمة المرور: mysecurepass"
-        sleep 320m
+        wget https://github.com/localxpose/cli/releases/latest/download/localxpose-linux-amd64.zip
+        unzip localxpose-linux-amd64.zip
+        chmod +x lx
+        ./lx authtoken rE9mIkydSoKxj1eZK3nAaGCfcdLTFn5xMN8mnFSR
+        ./lx tcp --port 5901 --region eu &
+        sleep 20
+        echo "✅ VNC Tunnel Started on LocalXpose - استخدم VNC بـ IP الظاهر لاحقًا"
+
+    - name: ⏳ Keep the session alive
+      run: sleep 320m
