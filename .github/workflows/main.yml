@@ -6,52 +6,65 @@ on:
 jobs:
   desktop:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # 6 hours
+    timeout-minutes: 360
 
     steps:
     - name: 1. Install Desktop & VNC Server
       run: |
         sudo apt-get update -y
         sudo apt-get install -y xfce4 xfce4-goodies tightvncserver wget curl git
-        
         mkdir -p ~/.vnc
         echo "mysecurepass" | vncpasswd -f > ~/.vnc/passwd
         chmod 600 ~/.vnc/passwd
-        
         cat <<EOF > ~/.vnc/xstartup
         #!/bin/bash
         startxfce4 &
         EOF
         chmod +x ~/.vnc/xstartup
-        
-        vncserver -geometry 1280x720 -depth 24 :1
-        echo "VNC server started on port 5901"
+        vncserver -geometry 1280x800 -depth 24 :1
+        echo "✅ VNC server started on port 5901"
 
-    - name: 2. Setup noVNC (The New Fix)
+    - name: 2. Setup and Run noVNC (Single Block Fix)
       run: |
-        # --- THE NEW FIX: Correct way to clone a specific tag ---
-        # 1. Clone the repository first
+        # All commands are now in ONE block to maintain the working directory
+        echo "--- Cloning noVNC repository ---"
         git clone https://github.com/novnc/noVNC.git
-        # 2. Enter the directory
+        
+        # Change directory into the cloned folder
         cd noVNC
-        # 3. Checkout the specific stable tag
+        
+        echo "--- Current directory: $(pwd) ---"
+        
+        echo "--- Checking out stable tag v1.4.0 ---"
         git checkout v1.4.0
-        # 4. Navigate back to the parent directory
+        
+        echo "--- Initializing Submodules ---"
+        git submodule update --init --recursive
+        
+        echo "--- Verifying that launch.sh exists in utils ---"
+        if [ -f "utils/launch.sh" ]; then
+          echo "✅ Found launch.sh"
+        else
+          echo "❌ ERROR: launch.sh not found after submodule update!"
+          exit 1
+        fi
+        
+        echo "--- Starting noVNC server ---"
+        # Since we are inside the 'noVNC' directory, we use a relative path
+        ./utils/launch.sh --vnc localhost:5901 --listen 6080 > ../novnc.log 2>&1 &
+        
+        # Go back to the parent directory for the next steps
         cd ..
-        
-        # Now the launch script will exist at ./noVNC/utils/launch.sh
-        nohup ./noVNC/utils/launch.sh --vnc localhost:5901 --listen 6080 > novnc.log 2>&1 &
-        
+
+        echo "--- Waiting for noVNC service to start ---"
         sleep 10
         
-        echo "---- noVNC Log Start ----"
-        cat novnc.log || echo "novnc.log not found."
-        echo "---- noVNC Log End ----"
+        echo "---- Displaying noVNC Log ----"
+        cat novnc.log
         
-        echo "Checking if noVNC service is running on port 6080..."
-        curl -I --fail http://localhost:6080 || (echo "❌ فشل تشغيل noVNC! The service is not responding on port 6080." && exit 1)
-        echo "✅ noVNC is running successfully."
-
+        echo "--- Checking if noVNC is reachable ---"
+        curl -I --fail http://localhost:6080 || (echo "❌ Final check failed: noVNC is not responding." && exit 1)
+        echo "✅ Success! noVNC is up and running."
 
     - name: 3. Start Cloudflared Tunnel
       run: |
@@ -60,13 +73,12 @@ jobs:
         
         nohup ./cloudflared tunnel --url http://localhost:6080 > tunnel.log 2>&1 &
         
-        echo "Waiting for Cloudflare Tunnel to generate the link..."
         sleep 15
         
-        echo "🔗 رابط الوصول لسطح المكتب (استخدم هذا الرابط):"
-        grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare.com' tunnel.log || echo "لم يتمكن من إيجاد الرابط. تحقق من 'tunnel.log' في Artifacts."
+        echo "🔗 رابط الوصول لسطح المكتب:"
+        grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare.com' tunnel.log
 
-    - name: 4. Keep alive
+    - name: 4. Keep session alive
       run: |
-        echo "⏳ الخادم يعمل الآن. سيبقى نشطًا حتى انتهاء الوقت المخصص (أو إيقافه يدويًا)."
-        sleep 21300 # Approximately 5 hours and 55 minutes
+        echo "⏳ الخادم يعمل الآن..."
+        sleep 21300
