@@ -1,0 +1,28 @@
+name: RDP over Serveo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  serveo-vnc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: 🧰 Install Desktop + VNC
+      run: |
+        sudo apt update
+        sudo apt install -y xfce4 xfce4-goodies tightvncserver openssh-client
+        vncserver :1
+        vncserver -kill :1
+        echo "#!/bin/bash
+        startxfce4 &" > ~/.vnc/xstartup
+        chmod +x ~/.vnc/xstartup
+        vncserver :1
+
+    - name: 🔗 Create tunnel using Serveo
+      run: |
+        ssh -o StrictHostKeyChecking=no -R 5900:localhost:5901 serveo.net &
+        sleep 30
+        echo "✅ افتح VNC على: serveo.net:5900"
+        sleep 320m
