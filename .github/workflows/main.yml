@@ -26,7 +26,8 @@ jobs:
       run: |
         git clone https://github.com/novnc/noVNC.git
         git clone https://github.com/novnc/websockify noVNC/utils/websockify
-        nohup noVNC/utils/launch.sh --vnc localhost:5901 &
+        nohup noVNC/utils/launch.sh --vnc localhost:5901 --listen 6080 &
+        sleep 15  # 🟡 انتظر شوية عشان تتأكد إن noVNC اشتغل
 
     - name: ☁️ Create Tunnel using Cloudflared
       run: |
