@@ -12,7 +12,7 @@ jobs:
     - name: 1. Install Desktop & VNC Server
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y xfce4 xfce4-goodies tightvncserver wget curl git
+        sudo apt-get install -y xfce4 xfce4-goodies tightvncserver wget curl git unzip
         mkdir -p ~/.vnc
         echo "mysecurepass" | vncpasswd -f > ~/.vnc/passwd
         chmod 600 ~/.vnc/passwd
@@ -24,57 +24,43 @@ jobs:
         vncserver -geometry 1280x800 -depth 24 :1
         echo "✅ VNC server started on port 5901"
 
-    - name: 2. Setup and Run noVNC (Single Block Fix)
+    - name: 2. Setup noVNC (The Foolproof Method)
       run: |
-        # All commands are now in ONE block to maintain the working directory
-        echo "--- Cloning noVNC repository ---"
-        git clone https://github.com/novnc/noVNC.git
+        # --- THE DEFINITIVE FIX: Download the pre-packaged release directly ---
+        echo "--- Downloading the official noVNC v1.4.0 release package ---"
+        wget -O noVNC.zip https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.zip
         
-        # Change directory into the cloned folder
-        cd noVNC
+        echo "--- Unzipping the package ---"
+        unzip noVNC.zip
         
-        echo "--- Current directory: $(pwd) ---"
+        # The zip file extracts to a folder named 'noVNC-1.4.0'
+        # Let's verify that the launch.sh script is inside it
+        echo "--- Verifying launch.sh exists in the extracted folder ---"
+        ls -l noVNC-1.4.0/utils/
         
-        echo "--- Checking out stable tag v1.4.0 ---"
-        git checkout v1.4.0
-        
-        echo "--- Initializing Submodules ---"
-        git submodule update --init --recursive
-        
-        echo "--- Verifying that launch.sh exists in utils ---"
-        if [ -f "utils/launch.sh" ]; then
-          echo "✅ Found launch.sh"
-        else
-          echo "❌ ERROR: launch.sh not found after submodule update!"
+        if [ ! -f "noVNC-1.4.0/utils/launch.sh" ]; then
+          echo "❌ Critical Error: launch.sh not found even in the release ZIP. Something is wrong with the source."
           exit 1
         fi
-        
-        echo "--- Starting noVNC server ---"
-        # Since we are inside the 'noVNC' directory, we use a relative path
-        ./utils/launch.sh --vnc localhost:5901 --listen 6080 > ../novnc.log 2>&1 &
-        
-        # Go back to the parent directory for the next steps
-        cd ..
 
-        echo "--- Waiting for noVNC service to start ---"
+        echo "--- Starting noVNC server from the correct path ---"
+        ./noVNC-1.4.0/utils/launch.sh --vnc localhost:5901 --listen 6080 > novnc.log 2>&1 &
+        
         sleep 10
         
         echo "---- Displaying noVNC Log ----"
         cat novnc.log
         
-        echo "--- Checking if noVNC is reachable ---"
-        curl -I --fail http://localhost:6080 || (echo "❌ Final check failed: noVNC is not responding." && exit 1)
-        echo "✅ Success! noVNC is up and running."
+        echo "--- Final check: Is noVNC reachable? ---"
+        curl -I --fail http://localhost:6080 || (echo "❌ The service is still not responding. Please check novnc.log for errors." && exit 1)
+        echo "✅ Success! noVNC is finally up and running."
 
     - name: 3. Start Cloudflared Tunnel
       run: |
         wget -q -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
-        
         nohup ./cloudflared tunnel --url http://localhost:6080 > tunnel.log 2>&1 &
-        
         sleep 15
-        
         echo "🔗 رابط الوصول لسطح المكتب:"
         grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare.com' tunnel.log
 
