@@ -23,13 +23,14 @@ jobs:
 
     - name: 🔗 Install & Start LocalXpose Tunnel
       run: |
-        wget https://github.com/localxpose/cli/releases/latest/download/lx-linux.zip
-        unzip lx-linux.zip
-        chmod +x lx
-        ./lx authtoken rE9mIkydSoKxj1eZK3nAaGCfcdLTFn5xMN8mnFSR
-        ./lx tcp --port 5901 --region eu &
+        wget https://api.localxpose.io/api/downloads/loclx-linux-amd64.zip -O loclx.zip
+        unzip loclx.zip
+        chmod +x loclx
+        ./loclx authtoken rE9mIkydSoKxj1eZK3nAaGCfcdLTFn5xMN8mnFSR
+        ./loclx tcp --port 5901 --region eu &
         sleep 20
         echo "✅ VNC Tunnel Started on LocalXpose - راجع لوحة التحكم لرؤية الرابط"
+
 
 
     - name: ⏳ Keep the session alive
