@@ -1,40 +1,41 @@
-name: VNC with Web Access (Cloudflared)
+name: Cloud Desktop via GitHub
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-vnc:
+  desktop:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-    - name: 🧰 Install Desktop & VNC
+    - name: 🧰 Install XFCE + VNC
       run: |
         sudo apt update
-        sudo apt install -y xfce4 xfce4-goodies tightvncserver wget curl
-
+        sudo apt install -y xfce4 xfce4-goodies tightvncserver git curl wget
         mkdir -p ~/.vnc
         echo "mysecurepass" | vncpasswd -f > ~/.vnc/passwd
         chmod 600 ~/.vnc/passwd
-        echo '#!/bin/bash
-        startxfce4 &' > ~/.vnc/xstartup
+        echo "#!/bin/bash
+        startxfce4 &" > ~/.vnc/xstartup
         chmod +x ~/.vnc/xstartup
         vncserver :1
 
-    - name: 🌐 Install noVNC and Websockify
+    - name: 🌐 Setup noVNC + websockify
       run: |
         git clone https://github.com/novnc/noVNC.git
         git clone https://github.com/novnc/websockify noVNC/utils/websockify
         nohup noVNC/utils/launch.sh --vnc localhost:5901 --listen 6080 &
-        sleep 15  # 🟡 انتظر شوية عشان تتأكد إن noVNC اشتغل
+        sleep 15  # انتظر حتى noVNC يكون جاهز
 
-    - name: ☁️ Create Tunnel using Cloudflared
+    - name: ☁️ Start Cloudflare Tunnel
       run: |
         wget -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
-        ./cloudflared tunnel --url http://localhost:6080 &
+        ./cloudflared tunnel --url http://localhost:6080 > tunnel.log 2>&1 &
         sleep 10
+        echo "🌐 رابط التحكم سينطبع بعد قليل:"
+        cat tunnel.log | grep "trycloudflare.com"
 
-    - name: 💤 Keep alive
-      run: sleep 320m
+    - name: 💤 Keep Alive
+      run: sleep 300m
