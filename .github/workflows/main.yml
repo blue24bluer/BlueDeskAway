@@ -13,8 +13,9 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y xfce4 xfce4-goodies tightvncserver openssh-client
-        vncserver :1
-        vncserver -kill :1
+        mkdir -p ~/.vnc
+        echo "mysecurepass" | vncpasswd -f > ~/.vnc/passwd
+        chmod 600 ~/.vnc/passwd
         echo "#!/bin/bash
         startxfce4 &" > ~/.vnc/xstartup
         chmod +x ~/.vnc/xstartup
@@ -24,5 +25,5 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no -R 5900:localhost:5901 serveo.net &
         sleep 30
-        echo "✅ افتح VNC على: serveo.net:5900"
+        echo "✅ افتح VNC على: serveo.net:5900 بكلمة المرور: mysecurepass"
         sleep 320m
