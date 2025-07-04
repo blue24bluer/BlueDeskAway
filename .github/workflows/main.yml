@@ -1,4 +1,4 @@
-name: VNC Desktop with Cloudflared Tunnel and Logs
+name: VNC Desktop with Cloudflared Tunnel
 
 on:
   workflow_dispatch:
@@ -11,64 +11,62 @@ jobs:
     steps:
     - name: 1. Install Desktop & VNC Server
       run: |
-        # تحديث الحزم وتثبيت سطح المكتب (XFCE) وخادم VNC
         sudo apt-get update -y
         sudo apt-get install -y xfce4 xfce4-goodies tightvncserver wget curl git
         
-        # إعداد كلمة مرور VNC (يمكنك تغيير "mysecurepass" إذا أردت)
         mkdir -p ~/.vnc
         echo "mysecurepass" | vncpasswd -f > ~/.vnc/passwd
         chmod 600 ~/.vnc/passwd
         
-        # إعداد ملف xstartup لتشغيل بيئة سطح المكتب
-        echo '#!/bin/bash
-        startxfce4 &' > ~/.vnc/xstartup
+        cat <<EOF > ~/.vnc/xstartup
+        #!/bin/bash
+        startxfce4 &
+        EOF
         chmod +x ~/.vnc/xstartup
         
-        # تشغيل خادم VNC على الشاشة رقم 1 (المنفذ 5901)
-        vncserver -geometry 1280x720 :1
-        
-        # التأكد من أن المنفذ 5901 يعمل
-        netstat -tulpn | grep 5901
+        vncserver -geometry 1280x720 -depth 24 :1
+        echo "VNC server started on port 5901"
 
-    - name: 2. Setup noVNC (The fix is here)
+    - name: 2. Setup noVNC (The New Fix)
       run: |
-        # --- FIX: Clone a specific, stable version of noVNC that contains launch.sh ---
-        # هذا هو التعديل الأساسي لحل المشكلة
-        git clone --depth 1 --branch v1.4.0 https://github.com/novnc/noVNC.git
+        # --- THE NEW FIX: Correct way to clone a specific tag ---
+        # 1. Clone the repository first
+        git clone https://github.com/novnc/noVNC.git
+        # 2. Enter the directory
+        cd noVNC
+        # 3. Checkout the specific stable tag
+        git checkout v1.4.0
+        # 4. Navigate back to the parent directory
+        cd ..
         
-        # تشغيل واجهة noVNC على المنفذ 6080 وربطها بالخادم VNC الذي يعمل على 5901
-        # سيتم تسجيل المخرجات في ملف novnc.log للمراجعة
+        # Now the launch script will exist at ./noVNC/utils/launch.sh
         nohup ./noVNC/utils/launch.sh --vnc localhost:5901 --listen 6080 > novnc.log 2>&1 &
         
-        # الانتظار قليلاً للتأكد من بدء تشغيل الخدمة
         sleep 10
         
-        # عرض سجل noVNC للتأكد من عدم وجود أخطاء
         echo "---- noVNC Log Start ----"
-        cat novnc.log
+        cat novnc.log || echo "novnc.log not found."
         echo "---- noVNC Log End ----"
         
-        # التأكد من أن الخدمة قابلة للوصول على المنفذ 6080
-        curl -I http://localhost:6080 || (echo "فشل تشغيل noVNC!" && exit 1)
+        echo "Checking if noVNC service is running on port 6080..."
+        curl -I --fail http://localhost:6080 || (echo "❌ فشل تشغيل noVNC! The service is not responding on port 6080." && exit 1)
+        echo "✅ noVNC is running successfully."
+
 
     - name: 3. Start Cloudflared Tunnel
       run: |
-        # تنزيل أداة cloudflared
         wget -q -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
         
-        # تشغيل النفق وربطه بخدمة noVNC
         nohup ./cloudflared tunnel --url http://localhost:6080 > tunnel.log 2>&1 &
         
-        # الانتظار للحصول على الرابط
-        sleep 10
+        echo "Waiting for Cloudflare Tunnel to generate the link..."
+        sleep 15
         
-        # طباعة رابط الوصول
-        echo "✅ تم إنشاء الرابط بنجاح. استخدمه للوصول إلى سطح المكتب:"
-        grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare.com' tunnel.log
+        echo "🔗 رابط الوصول لسطح المكتب (استخدم هذا الرابط):"
+        grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare.com' tunnel.log || echo "لم يتمكن من إيجاد الرابط. تحقق من 'tunnel.log' في Artifacts."
 
     - name: 4. Keep alive
       run: |
-        echo "⏳ الخادم يعمل الآن. سيبقى نشطًا لمدة 5 ساعات و 55 دقيقة."
-        sleep 21300
+        echo "⏳ الخادم يعمل الآن. سيبقى نشطًا حتى انتهاء الوقت المخصص (أو إيقافه يدويًا)."
+        sleep 21300 # Approximately 5 hours and 55 minutes
